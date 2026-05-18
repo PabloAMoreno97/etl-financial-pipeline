@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+
     alpha_vantage_api_key: str
     postgres_host: str = "localhost"
     postgres_port: int = 5432
