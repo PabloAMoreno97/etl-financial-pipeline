@@ -11,5 +11,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ ./src/
+COPY migrations/ ./migrations/
+COPY scripts/start.sh ./start.sh
+RUN chmod +x ./start.sh
 
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["./start.sh"]

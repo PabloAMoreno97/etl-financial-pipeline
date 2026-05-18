@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: etl-financial-api
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: ALPHA_VANTAGE_API_KEY
+        sync: false
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: financial-db
+          property: host
+      - key: POSTGRES_PORT
+        fromDatabase:
+          name: financial-db
+          property: port
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: financial-db
+          property: database
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: financial-db
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: financial-db
+          property: password
+
+databases:
+  - name: financial-db
+    databaseName: financial_db
+    user: postgres
+    plan: free
