@@ -14,10 +14,14 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
-        return (
+        base = (
             f"postgresql+psycopg2://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
+        # Cloud DBs require SSL; localhost does not
+        if self.postgres_host != "localhost":
+            base += "?sslmode=require"
+        return base
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
