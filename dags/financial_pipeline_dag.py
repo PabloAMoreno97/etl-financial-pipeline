@@ -38,20 +38,13 @@ def ingest_prices(symbol: str, **context) -> None:
 
 def compute_and_load_metrics(symbol: str, **context) -> None:
     import sys
-    import pandas as pd
     sys.path.insert(0, "/opt/airflow")
-    from sqlalchemy import text
-    from src.loaders.postgres_loader import get_engine, upsert_analytics_metrics
+    from src.loaders.postgres_loader import get_engine, read_prices_raw, upsert_analytics_metrics
     from src.transformations.metrics import compute_metrics
     from src.config import settings
 
     engine = get_engine(settings.database_url)
-    with engine.connect() as conn:
-        df = pd.read_sql(
-            text("SELECT * FROM raw.daily_prices WHERE symbol = :symbol ORDER BY date"),
-            conn,
-            params={"symbol": symbol},
-        )
+    df = read_prices_raw(engine, symbol)
     if df.empty:
         logger.warning("No raw data found for %s, skipping metrics", symbol)
         return
