@@ -38,7 +38,9 @@ class AlphaVantageClient:
         if "Error Message" in data:
             raise ValueError(f"Alpha Vantage error: {data['Error Message']}")
         if "Note" in data:
-            logger.warning("Alpha Vantage rate limit note: %s", data["Note"])
+            raise RuntimeError(f"Alpha Vantage rate limit: {data['Note']}")
+        if "Information" in data:
+            raise RuntimeError(f"Alpha Vantage API limit: {data['Information']}")
         return data
 
     def get_daily_prices(
