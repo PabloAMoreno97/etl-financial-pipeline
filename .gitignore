@@ -16,7 +16,6 @@ env/
 # Environment variables — NEVER commit these
 .env
 .env.local
-.env.*
 *.env
 
 # Pytest
@@ -49,3 +48,6 @@ Thumbs.db
 # Claude Code (local only)
 .claude/
 CLAUDE.md
+
+# Ruff
+.ruff_cache/
