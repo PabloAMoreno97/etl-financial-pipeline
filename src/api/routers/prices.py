@@ -43,6 +43,7 @@ def get_raw_prices(
     start: date | None = Query(None),
     end: date | None = Query(None),
     limit: int = Query(100, le=500),
+    offset: int = Query(0, ge=0),
 ):
     """Daily OHLCV data from the raw schema."""
     query = "SELECT * FROM raw.daily_prices WHERE symbol = :symbol"
@@ -53,8 +54,9 @@ def get_raw_prices(
     if end:
         query += " AND date <= :end"
         params["end"] = end
-    query += " ORDER BY date DESC LIMIT :limit"
+    query += " ORDER BY date DESC LIMIT :limit OFFSET :offset"
     params["limit"] = limit
+    params["offset"] = offset
 
     with engine.connect() as conn:
         df = pd.read_sql(text(query), conn, params=params)
@@ -70,6 +72,7 @@ def get_metrics(
     start: date | None = Query(None),
     end: date | None = Query(None),
     limit: int = Query(100, le=500),
+    offset: int = Query(0, ge=0),
 ):
     """Computed analytics metrics (MA, volatility, returns)."""
     query = "SELECT * FROM analytics.price_metrics WHERE symbol = :symbol"
@@ -80,8 +83,9 @@ def get_metrics(
     if end:
         query += " AND date <= :end"
         params["end"] = end
-    query += " ORDER BY date DESC LIMIT :limit"
+    query += " ORDER BY date DESC LIMIT :limit OFFSET :offset"
     params["limit"] = limit
+    params["offset"] = offset
 
     with engine.connect() as conn:
         df = pd.read_sql(text(query), conn, params=params)
