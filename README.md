@@ -1,5 +1,7 @@
 # etl-financial-pipeline
 
+![CI](https://github.com/pablolm97/etl-financial-pipeline/actions/workflows/ci.yml/badge.svg)
+
 End-to-end batch ETL pipeline that ingests daily stock price data from **Alpha Vantage**, computes financial metrics, stores results in **PostgreSQL** (raw + analytics schema), and exposes the data via a **FastAPI** REST API — orchestrated with **Apache Airflow**.
 
 ## Architecture
