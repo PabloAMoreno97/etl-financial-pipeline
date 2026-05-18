@@ -4,6 +4,8 @@
 
 End-to-end batch ETL pipeline that ingests daily stock price data from **Alpha Vantage**, computes financial metrics, stores results in **PostgreSQL** (raw + analytics schema), and exposes the data via a **FastAPI** REST API — orchestrated with **Apache Airflow**.
 
+**Live API:** https://etl-financial-api.onrender.com/docs
+
 ## Architecture
 
 ```
@@ -13,14 +15,14 @@ Alpha Vantage API
  [Airflow DAG]  ── runs weekdays at 18:00 UTC (after US market close)
       │
       ├─► PostgreSQL · raw.daily_prices         ← OHLCV as-received
-      │
+      │         (Neon — serverless PostgreSQL)
       └─► PostgreSQL · analytics.price_metrics  ← MA7/21/50, volatility, returns
                                 │
                                 ▼
-                          FastAPI REST API
-                       GET /prices/raw/{symbol}
-                       GET /prices/metrics/{symbol}
-                       GET /prices/symbols
+                     FastAPI REST API (Render)
+                  GET /prices/raw/{symbol}
+                  GET /prices/metrics/{symbol}
+                  GET /prices/symbols
 ```
 
 ## Stack
@@ -29,13 +31,32 @@ Alpha Vantage API
 |---|---|
 | Data source | Alpha Vantage (free tier) |
 | Transformation | Pandas — rolling metrics, pct_change |
-| Storage | PostgreSQL 16 — schemas `raw` / `analytics` |
-| Orchestration | Apache Airflow 2.10 (LocalExecutor) |
+| Storage | PostgreSQL (Neon) — schemas `raw` / `analytics` |
+| Orchestration | Apache Airflow 2.10 (LocalExecutor, Docker) |
 | API | FastAPI + Pydantic v2 + Uvicorn |
-| Infra | Docker Compose |
+| Infra (local) | Docker Compose |
+| Infra (cloud) | Render (API) + Neon (PostgreSQL) |
 | Tests | Pytest — unit (transformations) + integration (API) |
 
-## Getting started
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/health` | Health check |
+| `GET` | `/prices/symbols` | List available symbols |
+| `GET` | `/prices/raw/{symbol}` | Daily OHLCV data |
+| `GET` | `/prices/metrics/{symbol}` | Computed analytics metrics |
+
+Query params: `start`, `end` (date), `limit` (max 500).
+
+```bash
+# Examples
+curl "https://etl-financial-api.onrender.com/prices/symbols"
+curl "https://etl-financial-api.onrender.com/prices/raw/AAPL?limit=10"
+curl "https://etl-financial-api.onrender.com/prices/metrics/MSFT?start=2024-01-01"
+```
+
+## Getting started locally
 
 ### Prerequisites
 
@@ -46,14 +67,13 @@ Alpha Vantage API
 
 ```bash
 cp .env.example .env
-# Edit .env and set your ALPHA_VANTAGE_API_KEY and a secure POSTGRES_PASSWORD
+# Edit .env: set ALPHA_VANTAGE_API_KEY, POSTGRES_PASSWORD, and Airflow keys
 ```
 
-Generate Airflow keys:
+Generate Airflow Fernet key:
 
 ```bash
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-# Paste the result as AIRFLOW__CORE__FERNET_KEY in .env
 ```
 
 ### 2. Start services
@@ -62,39 +82,75 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 docker compose up -d
 ```
 
-Services:
-- **PostgreSQL** → `localhost:5432`
-- **Airflow webserver** → `http://localhost:8080` (user: `admin`, password: `admin`)
-- **FastAPI** → `http://localhost:8000` (docs at `/docs`)
+| Service | URL |
+|---|---|
+| Airflow UI | http://localhost:8080 (admin / admin) |
+| FastAPI docs | http://localhost:8000/docs |
+| PostgreSQL | localhost:5432 |
 
 ### 3. Trigger the pipeline
 
-Either wait for the daily schedule or trigger manually from the Airflow UI:
-`DAGs → financial_pipeline → Trigger DAG`
+In the Airflow UI: `DAGs → financial_pipeline → Trigger DAG ▶`
 
-### 4. Query the API
+Or wait for the daily schedule (weekdays 18:00 UTC).
 
-```bash
-# Last 100 days of AAPL raw prices
-curl "http://localhost:8000/prices/raw/AAPL"
-
-# Analytics metrics with date range
-curl "http://localhost:8000/prices/metrics/MSFT?start=2024-01-01&end=2024-06-30"
-
-# Available symbols
-curl "http://localhost:8000/prices/symbols"
-```
-
-## Running tests locally
+## Running tests
 
 ```bash
 pip install -r requirements.txt
 pytest tests/ -v --cov=src --cov-report=term-missing
 ```
 
+## Deploying to production (Render + Neon)
+
+The project includes a `render.yaml` blueprint for one-click deploy.
+
+1. Create a free PostgreSQL database at [neon.tech](https://neon.tech)
+2. In the Neon SQL Editor, run `migrations/001_initial_schema.sql`
+3. Connect the GitHub repo to Render → **New Blueprint**
+4. Set `POSTGRES_*` env vars in Render pointing to your Neon database
+5. Bootstrap initial data:
+   ```bash
+   POSTGRES_HOST=<neon-host> POSTGRES_DB=neondb ... python scripts/bootstrap_render.py
+   ```
+
+## Project structure
+
+```
+etl-financial-pipeline/
+├── dags/
+│   └── financial_pipeline_dag.py   # Airflow DAG — daily, 5 symbols
+├── src/
+│   ├── config.py                   # Settings (pydantic-settings)
+│   ├── connectors/
+│   │   └── alpha_vantage.py        # API client with throttling + retry
+│   ├── transformations/
+│   │   └── metrics.py              # MA7/21/50, volatility, returns
+│   ├── loaders/
+│   │   └── postgres_loader.py      # Upsert via psycopg2 execute_values
+│   └── api/
+│       ├── main.py
+│       ├── dependencies.py
+│       └── routers/prices.py       # GET /raw, /metrics, /symbols
+├── migrations/
+│   └── 001_initial_schema.sql      # raw + analytics schemas
+├── scripts/
+│   ├── bootstrap_render.py         # One-time data seed for production
+│   └── start.sh                    # Docker entrypoint (migrate + serve)
+├── tests/
+│   ├── conftest.py
+│   ├── unit/test_metrics.py        # 7 unit tests on transformations
+│   └── integration/test_api.py     # API tests with SQLite in-memory
+├── docker-compose.yml              # postgres + airflow + api
+├── Dockerfile                      # API container
+├── Dockerfile.airflow              # Airflow + custom deps
+└── render.yaml                     # Render deploy blueprint
+```
+
 ## Design decisions
 
 - **Two-schema approach (`raw` → `analytics`):** raw data is immutable once ingested; the analytics layer is fully recomputable from raw at any time.
-- **Upsert pattern (`ON CONFLICT DO NOTHING / DO UPDATE`):** the DAG is idempotent — safe to re-run without duplicating data.
-- **Retry with exponential backoff (`tenacity`):** Alpha Vantage free tier has strict rate limits; the connector handles transient failures transparently.
-- **LocalExecutor in Airflow:** sufficient for a single-machine setup; swap to CeleryExecutor + Redis for distributed workers in production.
+- **Upsert via `execute_values`:** bypasses the SQLAlchemy/pandas version mismatch between Airflow (SA 1.4) and the API container (SA 2.0). Psycopg2 native batch insert is also faster than `to_sql`.
+- **Idempotent DAG:** `ON CONFLICT DO NOTHING / DO UPDATE` makes reruns safe without duplicating data.
+- **Throttling + retry (`tenacity`):** Alpha Vantage free tier limits 5 req/min — the connector handles this transparently with exponential backoff.
+- **Neon for production DB:** serverless PostgreSQL with IPv4 support, no expiry on free tier. Airflow stays local; only the API is cloud-deployed.
