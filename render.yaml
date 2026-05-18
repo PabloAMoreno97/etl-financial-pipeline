@@ -9,27 +9,12 @@ services:
       - key: ALPHA_VANTAGE_API_KEY
         sync: false
       - key: POSTGRES_HOST
-        fromDatabase:
-          name: financial-db
-          property: host
+        sync: false
       - key: POSTGRES_PORT
-        fromDatabase:
-          name: financial-db
-          property: port
+        sync: false
       - key: POSTGRES_DB
-        fromDatabase:
-          name: financial-db
-          property: database
+        sync: false
       - key: POSTGRES_USER
-        fromDatabase:
-          name: financial-db
-          property: user
+        sync: false
       - key: POSTGRES_PASSWORD
-        fromDatabase:
-          name: financial-db
-          property: password
-
-databases:
-  - name: financial-db
-    databaseName: financial_db
-    plan: free
+        sync: false
