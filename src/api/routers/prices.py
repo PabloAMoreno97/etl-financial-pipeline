@@ -91,7 +91,7 @@ def get_metrics(
         df = pd.read_sql(text(query), conn, params=params)
     if df.empty:
         raise HTTPException(status_code=404, detail=f"No metrics found for symbol '{symbol}'")
-    return df.where(pd.notnull(df), other=None).to_dict(orient="records")
+    return df.astype(object).where(df.notna(), None).to_dict(orient="records")
 
 
 @router.get("/symbols")
