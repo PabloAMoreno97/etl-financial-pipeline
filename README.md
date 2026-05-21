@@ -101,19 +101,6 @@ pip install -r requirements.txt
 pytest tests/ -v --cov=src --cov-report=term-missing
 ```
 
-## Deploying to production (Render + Neon)
-
-The project includes a `render.yaml` blueprint for one-click deploy.
-
-1. Create a free PostgreSQL database at [neon.tech](https://neon.tech)
-2. In the Neon SQL Editor, run `migrations/001_initial_schema.sql`
-3. Connect the GitHub repo to Render → **New Blueprint**
-4. Set `POSTGRES_*` env vars in Render pointing to your Neon database
-5. Bootstrap initial data:
-   ```bash
-   POSTGRES_HOST=<neon-host> POSTGRES_DB=neondb ... python scripts/bootstrap_render.py
-   ```
-
 ## Project structure
 
 ```
